@@ -1,6 +1,10 @@
 #define SYSTEM_CODE (0x18010421)    
 #define DATA_BLOCK_SIZE (1024)
 #define MAX_FILE_SIZE   (6144)
+#define DATA_BLOCK_NUM  (4063)
+#define INODE_NUM   (1024)
+#define TYPE_FILE   (0)
+#define TYPE_DIR    (1)
 
 typedef signed char        int8_t;
 typedef short              int16_t;
@@ -19,7 +23,7 @@ typedef struct super_block {
     uint32_t block_map[128];            // 数据块占用位图
     uint32_t inode_map[32];             // inode占用位图
 } sp_block;
-
+static sp_block SP_BLK;
 struct inode {
     uint32_t size;              // 文件大小
     uint16_t file_type;         // 文件类型（文件/文件夹）
@@ -27,7 +31,8 @@ struct inode {
     uint32_t block_point[6];    // 数据块指针
 };
 
-struct inode inodes[1024];
+static struct inode inodes[1024];
 // Error codes
 #define OPEN_ERR    -1
 #define CLOSE_ERR   -2
+#define CODE_ERR    -3

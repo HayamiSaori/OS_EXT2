@@ -1,16 +1,23 @@
 C = src
-CMD = \
-	$C/shell.c \
-	$C/ls.c \
-	$C/mkdir.c \
-	/*$C/cd.c \*/
-	$C/touch.c \
-	$C/cp.c \
-	$C/shutdown
 
-main.c:$(CMD)
-	gcc main.c -o main.o
+CMD = \
+	$(C)/ls.c \
+	$(C)/mkdir.c \
+	$(C)/touch.c \
+	$(C)/cp.c \
+	$(C)/shutdown
+
+# $(C)/shell.c:$(CMD)
+# 	gcc shell.c -o shell.o
 
 .PHONY:clean
 clean:
-	rm *.o
+	rm src/*.o;
+
+.PHONY:reset
+reset:
+	rm src/*.o;rm src/disk
+	
+.PHONY:run
+run:
+	gcc $(C)/shell.c -o $(C)/shell.o;cd $(C);./shell.o

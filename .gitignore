@@ -1,3 +1,5 @@
 /.vscode/
 *.o
 *.exe
+disk
+src/disk
