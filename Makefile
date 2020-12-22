@@ -9,8 +9,8 @@ CMD = \
 	$C/shutdown
 
 main.c:$(CMD)
-	gcc main.c -o main
+	gcc main.c -o main.o
 
 .PHONY:clean
 clean:
-	
+	rm *.o
