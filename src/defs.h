@@ -5,6 +5,7 @@
 #define INODE_NUM   (1024)
 #define TYPE_FILE   (0)
 #define TYPE_DIR    (1)
+#define ROOT_DIR_ID (2)
 
 typedef signed char        int8_t;
 typedef short              int16_t;
@@ -23,7 +24,7 @@ typedef struct super_block {
     uint32_t block_map[128];            // 数据块占用位图
     uint32_t inode_map[32];             // inode占用位图
 } sp_block;
-static sp_block SP_BLK;
+extern sp_block SP_BLK;
 struct inode {
     uint32_t size;              // 文件大小
     uint16_t file_type;         // 文件类型（文件/文件夹）
@@ -31,8 +32,11 @@ struct inode {
     uint32_t block_point[6];    // 数据块指针
 };
 
-static struct inode inodes[1024];
+extern struct inode inodes[1024];
 // Error codes
 #define OPEN_ERR    -1
 #define CLOSE_ERR   -2
 #define CODE_ERR    -3
+#define SYNTAX_ERR  -4
+#define NO_BLOCK    -5
+#define PATH_ERR    -6

@@ -4,20 +4,29 @@ CMD = \
 	$(C)/ls.c \
 	$(C)/mkdir.c \
 	$(C)/touch.c \
-	$(C)/cp.c \
-	$(C)/shutdown
+	$(C)/cp.c
 
-# $(C)/shell.c:$(CMD)
-# 	gcc shell.c -o shell.o
+CMD_O = \
+	$(C)/ls \
+	$(C)/mkdir \
+	$(C)/touch \
+	$(C)/cp
+
+$(C)/shell.c:$(CMD)
+	gcc $(C)/shell.c -o $(C)/shell
+$(CMD_O):$(CMD)
+	gcc $(CMD) -o $(CMD_O)
 
 .PHONY:clean
 clean:
-	rm src/*.o;
+	rm src/shell
 
 .PHONY:reset
 reset:
 	rm src/*.o;rm src/disk
-	
+
 .PHONY:run
 run:
-	gcc $(C)/shell.c -o $(C)/shell.o;cd $(C);./shell.o
+	make;
+	gcc $(C)/shell.c -o $(C)/shell;
+	cd $(C);./shell
