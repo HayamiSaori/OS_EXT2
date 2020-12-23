@@ -315,7 +315,7 @@ int mkdir(int argc,char* argv[])
     struct dir_item *pdir = (struct dir_item *)wbuf;
     SP_BLK.free_inode_count--;
     SP_BLK.dir_inode_count++;
-    SP_BLK.free_block_count--;
+    SP_BLK.free_block_count -= 2;
     new_inode_id = AllocateInode();
     new_block_num = AllocateBlock();
     // init the new inode.
@@ -391,8 +391,8 @@ int touch(int argc,char* argv[])
     char wbuf[512] = {0};
     struct dir_item *pdir = (struct dir_item *)wbuf;
     SP_BLK.free_inode_count--;
-    SP_BLK.dir_inode_count++;
-    SP_BLK.free_block_count--;
+    // SP_BLK.dir_inode_count++;
+    SP_BLK.free_block_count -= 2;
     new_inode_id = AllocateInode();
     new_block_num = AllocateBlock();
     // init the new inode.
