@@ -301,6 +301,83 @@ int mkdir(int argc,char* argv[])
         dirname = strtok(path,div);
         while (dirname != NULL)
         {
+            // printf("dirname:%s,cur_id:%d\n",dirname,cur_id);
+            cur_id = ScanDir(dirname,cur_id);
+            if(cur_id == PATH_ERR)
+            {
+                return PATH_ERR;
+            }
+            dirname = strtok(NULL,div);
+        }
+    }
+    int new_inode_id,new_block_num,cur_pos;
+    char wbuf[512] = {0};
+    struct dir_item *pdir = (struct dir_item *)wbuf;
+    SP_BLK.free_inode_count--;
+    SP_BLK.dir_inode_count++;
+    SP_BLK.free_block_count--;
+    new_inode_id = AllocateInode();
+    new_block_num = AllocateBlock();
+    // init the new inode.
+    inodes[new_inode_id].link++;
+    cur_pos = inodes[new_inode_id].link;
+    inodes[new_inode_id].block_point[cur_pos - 1] = new_block_num;
+    // printf("The block of %s is : %x\n",new_folder,new_block_num);
+    // set the directory inode.
+    new_block_num = AllocateBlock();
+    // printf("The block item of %s is : %x\n",new_folder,new_block_num);
+    inodes[cur_id].link++;
+    cur_pos = inodes[cur_id].link;
+    inodes[cur_id].block_point[cur_pos - 1] = new_block_num;
+    pdir -> inode_id = new_inode_id;
+    strcpy(pdir->name,argv[2]);
+    pdir -> type = TYPE_DIR;
+    pdir -> valid = ITEM_VALID;
+    open_disk();
+    disk_write_block(DATA_START+new_block_num*2,wbuf);
+    close_disk();
+    UpdateSuperBlock();
+    UpdateInode();
+}
+int touch(int argc,char* argv[])
+{
+    if(SP_BLK.free_inode_count <1)
+    {
+        printf("No more available inodes.\n");
+        return NO_INODE;
+    }
+    if(argc != 3)
+    {
+        printf("Syntax error!The number of arguments must be 3 : touch [path] [filename]\n");
+        return SYNTAX_ERR;
+    }
+    if(argv[1][0] == '/' || argv[1][ strlen(argv[1]) - 1 ] != '/')
+    {
+		// printf("The path you input is %s",argv[1]);
+        printf("Path error!The path must be like \"dir1/dir2/.../\" or \"root/\"\n");
+        return PATH_ERR;
+    }
+    if(strchr(argv[2],'/') != NULL)
+    {
+        printf("filename error!The new file can't include '/'\n");
+        return DIR_ERR;
+    }
+    uint32_t cur_id = 2;    // start at root directory:inode id 2
+    char path[MAX_ARG_LEN];
+    char new_folder[MAX_ARG_LEN];
+    char *dirname;
+    char div[2] = "/";
+    strcpy(path,argv[1]);
+    strcpy(new_folder,argv[2]);
+    if(!strcmp(path,"root/"))
+    {
+        cur_id = 2;
+    }
+    else
+    {
+        dirname = strtok(path,div);
+        while (dirname != NULL)
+        {
             printf("dirname:%s,cur_id:%d\n",dirname,cur_id);
             cur_id = ScanDir(dirname,cur_id);
             if(cur_id == PATH_ERR)
@@ -322,10 +399,10 @@ int mkdir(int argc,char* argv[])
     inodes[new_inode_id].link++;
     cur_pos = inodes[new_inode_id].link;
     inodes[new_inode_id].block_point[cur_pos - 1] = new_block_num;
-    printf("The block of %s is : %x\n",new_folder,new_block_num);
+    // printf("The block of %s is : %x\n",new_folder,new_block_num);
     // set the directory inode.
     new_block_num = AllocateBlock();
-    printf("The block item of %s is : %x\n",new_folder,new_block_num);
+    // printf("The block item of %s is : %x\n",new_folder,new_block_num);
     inodes[cur_id].link++;
     cur_pos = inodes[cur_id].link;
     inodes[cur_id].block_point[cur_pos - 1] = new_block_num;
@@ -339,13 +416,36 @@ int mkdir(int argc,char* argv[])
     UpdateSuperBlock();
     UpdateInode();
 }
-void touch(int argc,char* argv[])
+int cp(int argc,char* argv[])
 {
-
-}
-void cp(int argc,char* argv[])
-{
-
+    if(SP_BLK.free_inode_count <1)
+    {
+        printf("No more available inodes.\n");
+        return NO_INODE;
+    }
+    if(argc != 3)
+    {
+        printf("Syntax error!The number of arguments must be 3 : cp [src_path/filename] [dist_path]\n");
+        return SYNTAX_ERR;
+    }
+	char *filename;
+	char *dirname;
+	char src_path[MAX_ARG_LEN];
+	char div[2] = "/";
+	char *dst_argv[3];
+	strcpy(src_path,argv[1]);
+	dirname = strtok(src_path,div);
+	while(dirname != NULL)
+	{
+		filename = dirname;
+		printf("cur filename:%s\n",filename);
+		dirname = strtok(NULL,div);
+	}
+	char cmd[] = "touch";
+	dst_argv[0] = cmd;
+	dst_argv[1] = argv[2];
+	dst_argv[2] = filename;
+	touch(3,dst_argv);
 }
 int getcmd(char *buf, int nbuf)
 {

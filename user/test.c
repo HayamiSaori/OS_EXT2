@@ -22,5 +22,9 @@ int AllocateInode(void)
 }
 int main(void)
 {
-    printf("%d\n",(1 << 0));
+    char *filename;
+    char div[2] = "/";
+    char path[] = "abcd.h";
+    filename = strtok(path,div);
+    printf("%s\n",filename);
 }
