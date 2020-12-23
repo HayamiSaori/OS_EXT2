@@ -1,6 +1,5 @@
 #include "disk.h"
 #include "defs.h"
-#include "util.c"
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,6 +10,57 @@
 #define MAX_CMD_LEN (512)
 #define MAX_ARG_LEN (64)
 #define MAXARGS (10)
+struct inode inodes[1024];
+sp_block SP_BLK;
+int UpdateSuperBlock(void)
+{
+    char *p = (char *)(&SP_BLK);
+    char wbuf[512] = {0};
+    int i,j;
+    open_disk();
+    for(i=0;i<512;i++)
+    {
+        wbuf[i] = p[i];
+    }
+    disk_write_block(0,wbuf);
+    for(i=512;i<1024;i++)
+    {
+        wbuf[i - 512] = (i<656)?p[i]:0;
+    }
+    disk_write_block(1,wbuf);
+    close_disk();
+}
+int UpdateInode(void)
+{
+    char *p = (char *)inodes;
+    char wbuf[512] = {0};
+    int i,j=0,cur_block;
+    open_disk();
+    for(cur_block = 2;cur_block<=65;cur_block++)
+    {
+        for(i=0;i<512;i++)
+        {
+            wbuf[i] = p[i + j * 512];
+        }
+        j++;
+        disk_write_block(cur_block,wbuf);
+    }
+    close_disk();
+}
+// input a path,return the inode id of it
+/*int ScanPath(char *path)
+{
+    uint8_t i,j;
+    uint32_t cur_inode_id = ROOT_DIR_ID;
+    if((path[0] == '/') || (path[strlen(path) - 1] == '/'))
+    {
+        return PATH_ERR;   
+    }
+    for(i=0;i<strlen(path);i++)
+    {
+
+    }
+}*/
 int InitSuperBlock(void)
 {
     uint8_t buf[512] = {0};
@@ -25,12 +75,14 @@ int InitSuperBlock(void)
     pbuf = (uint32_t *)buf;
     if(pbuf[0] != SYSTEM_CODE)
     {
-        pbuf = (uint32_t *)wbuf;
-        pbuf[0] = SYSTEM_CODE;
-        pbuf[1] = DATA_BLOCK_NUM;
-        pbuf[2] = INODE_NUM;
-        pbuf[3] = 0;
-        disk_write_block(0,wbuf);
+        SP_BLK.magic_num = SYSTEM_CODE;
+        SP_BLK.free_block_count = DATA_BLOCK_NUM;
+        SP_BLK.free_inode_count = INODE_NUM - 1;
+        SP_BLK.dir_inode_count = 1;
+        SP_BLK.inode_map[0] = (1 << 29);
+        close_disk();
+        UpdateSuperBlock();
+        open_disk();
         disk_read_block(0,buf);
         pbuf = (uint32_t *)buf;
     }
@@ -96,8 +148,44 @@ int InitInode(void)
         return CLOSE_ERR;
     }
 }
+void ls(int argc,char* argv[])
+{
 
+}
+int mkdir(int argc,char* argv[])
+{
+    if(argc != 2)
+    {
+        printf("Syntax error!The number of arguments must be 2 : mkdir [path/dirname]\n");
+        return SYNTAX_ERR;
+    }
+    if(argv[1][0] == '/' || argv[1][ strlen(argv[1]) - 1 ] == '/')
+    {
+        printf("Path error!The path must be like \"dir1/dir2/.../filename\" \n");
+        return PATH_ERR;
+    }
+    char path[MAX_ARG_LEN];
+    strcpy(path,argv[1]);
+    printf("%s\n",path);
+    char *filename;
+    char *dirname;
+    char div[2] = "/";
+    dirname = strtok(path,div);
+    while (dirname != NULL)
+    {
+        filename = dirname;
+        dirname = strtok(NULL,div);
+    }
+    
+}
+void touch(int argc,char* argv[])
+{
 
+}
+void cp(int argc,char* argv[])
+{
+
+}
 int getcmd(char *buf, int nbuf)
 {
     printf("@ ");
@@ -142,7 +230,6 @@ int main(void)
     InitInode();
     printf("Done\nWelcome to use LDY's EXT2 File System Lite!\n");
     int fd,argc,i,j;
-    pid_t cur_pid,child_pid;
     char buf[128] = {0};
     char *argv[MAXARGS];
     while(getcmd(buf,sizeof(buf)) >= 0)
@@ -153,15 +240,25 @@ int main(void)
             return 0;
         }
         ScanCmd(buf,argv,&argc);
-        cur_pid = fork();
-        if(cur_pid == 0)
+        if(!strcmp(argv[0],"ls"))
         {
-            execv(argv[0],argv);
+            ls(argc,argv);
+        }
+        else if(!strcmp(argv[0],"mkdir"))
+        {
+            mkdir(argc,argv);
+        }
+        else if(!strcmp(argv[0],"touch"))
+        {
+            touch(argc,argv);
+        }
+        else if(!strcmp(argv[0],"cp"))
+        {
+            cp(argc,argv);
         }
         else
         {
-            child_pid = wait(NULL);
+            printf("No command named \"%s\",please input again.\n",argv[0]);
         }
     }
-    
 }
