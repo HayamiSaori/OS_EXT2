@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/wait.h>
 // super block:1024B=1KiB (disk block 0 to 1)
 // inodes:32768B=32KiB (disk block 2 to 65)
 // data blocks:4096-1-32=4063 (disk block 66 to ...)
@@ -54,7 +53,7 @@ int ScanDir(char *dirname,int cur_id)
     int i,j,block_num;
     struct dir_item *cur_dir;
     char buf[512];
-    printf("from scandir,parent id of %s:%x\n",dirname,cur_id);
+    // printf("from scandir,parent id of %s:%x\n",dirname,cur_id);
     // char singal_item[DIR_ITEM_SIZE];
     /*if(inodes[cur_id].file_type != TYPE_DIR)
     {
@@ -378,7 +377,7 @@ int touch(int argc,char* argv[])
         dirname = strtok(path,div);
         while (dirname != NULL)
         {
-            printf("dirname:%s,cur_id:%d\n",dirname,cur_id);
+            // printf("dirname:%s,cur_id:%d\n",dirname,cur_id);
             cur_id = ScanDir(dirname,cur_id);
             if(cur_id == PATH_ERR)
             {
@@ -438,7 +437,7 @@ int cp(int argc,char* argv[])
 	while(dirname != NULL)
 	{
 		filename = dirname;
-		printf("cur filename:%s\n",filename);
+		// printf("cur filename:%s\n",filename);
 		dirname = strtok(NULL,div);
 	}
 	char cmd[] = "touch";
