@@ -6,10 +6,11 @@
 #include <sys/wait.h>
 // super block:1024B=1KiB (disk block 0 to 1)
 // inodes:32768B=32KiB (disk block 2 to 65)
-// data blocks:4096-1-32=4063
+// data blocks:4096-1-32=4063 (disk block 66 to ...)
 #define MAX_CMD_LEN (512)
 #define MAX_ARG_LEN (64)
 #define MAXARGS (10)
+#define DATA_START  (66)
 struct inode inodes[1024];
 sp_block SP_BLK;
 int UpdateSuperBlock(void)
@@ -47,20 +48,79 @@ int UpdateInode(void)
     }
     close_disk();
 }
-// input a path,return the inode id of it
-/*int ScanPath(char *path)
+// input a direction,return the inode id of it
+int ScanDir(char *dirname,int cur_id)
 {
-    uint8_t i,j;
-    uint32_t cur_inode_id = ROOT_DIR_ID;
-    if((path[0] == '/') || (path[strlen(path) - 1] == '/'))
+    int i,j,block_num;
+    struct dir_item *cur_dir;
+    char buf[512];
+    printf("from scandir,parent id of %s:%x\n",dirname,cur_id);
+    // char singal_item[DIR_ITEM_SIZE];
+    /*if(inodes[cur_id].file_type != TYPE_DIR)
     {
-        return PATH_ERR;   
-    }
-    for(i=0;i<strlen(path);i++)
+        printf("Path error! No such directory name %s\n",dirname);
+        return PATH_ERR;
+    }*/
+    open_disk();
+    for(i=0;i<inodes[cur_id].link;i++)
     {
-
+        block_num = inodes[cur_id].block_point[i];
+        disk_read_block(DATA_START + block_num * 2, buf);
+        // memcpy(singal_item,buf,DIR_ITEM_SIZE);
+        cur_dir = (struct dir_item *)buf;
+        if((cur_dir -> type == TYPE_DIR) && (!strcmp(dirname,cur_dir->name)) && (cur_dir->valid == 1))
+        {
+            
+            return cur_dir->inode_id;
+        }
     }
-}*/
+    close_disk();
+}
+int AllocateInode(void)
+{
+    int i,j,temp_map,result;
+    for(i=0;i<32;i++)
+    {
+        if(SP_BLK.inode_map[i] != 0xffffffff) // means that there has available inode.
+        {
+            temp_map = SP_BLK.inode_map[i];
+            for(j=0;j<32;j++)
+            {
+                if(temp_map % 2 == 0)   // j-th bit of this map is available (from right to left)
+                {
+                    result = i * 32 + (31 - j);
+                    SP_BLK.inode_map[i] = SP_BLK.inode_map[i] | (1 << j);
+                    UpdateSuperBlock();
+                    return result;
+                }
+                temp_map = temp_map >> 1;
+            }
+        }
+    }
+}
+int AllocateBlock(void)
+{
+    int i,j,temp_map,result;
+    for(i=0;i<128;i++)
+    {
+        // printf("blockmap of %d:%x\n",i,SP_BLK.block_map[i]);
+        if(SP_BLK.block_map[i] != 0xffffffff) // means that there has available block.
+        {
+            temp_map = SP_BLK.block_map[i];
+            for(j=0;j<32;j++)
+            {
+                if(temp_map % 2 == 0)   // j-th bit of this map is available (from right to left)
+                {
+                    result = i * 32 + (31 - j);
+                    SP_BLK.block_map[i] = SP_BLK.block_map[i] | (1 << j);
+                    UpdateSuperBlock();
+                    return result;
+                }
+                temp_map = temp_map >> 1;
+            }
+        }
+    }
+}
 int InitSuperBlock(void)
 {
     uint8_t buf[512] = {0};
@@ -138,45 +198,146 @@ int InitInode(void)
         }
     }
     // The inode of root direction has not been initialized.It means that the disk is just created
-    if(inodes[2].file_type != TYPE_DIR) 
+    /*if(inodes[2].file_type != TYPE_DIR) 
     {
         inodes[2].file_type = TYPE_DIR;
         UpdateInode();
-    }
+    }*/
     if(close_disk() == -1)
     {
         return CLOSE_ERR;
     }
 }
-void ls(int argc,char* argv[])
-{
-
-}
-int mkdir(int argc,char* argv[])
+int ls(int argc,char* argv[])
 {
     if(argc != 2)
     {
-        printf("Syntax error!The number of arguments must be 2 : mkdir [path/dirname]\n");
+        printf("Syntax error!The number of arguments must be 2 : ls [path]\n");
         return SYNTAX_ERR;
     }
-    if(argv[1][0] == '/' || argv[1][ strlen(argv[1]) - 1 ] == '/')
+    if(argv[1][0] == '/' || argv[1][ strlen(argv[1]) - 1 ] != '/')
     {
-        printf("Path error!The path must be like \"dir1/dir2/.../filename\" \n");
+        printf("Path error!The path must be like \"dir1/dir2/.../\" or \"root/\"\n");
         return PATH_ERR;
     }
+    uint32_t cur_id = 2;    // start at root directory:inode id 2
     char path[MAX_ARG_LEN];
-    strcpy(path,argv[1]);
-    printf("%s\n",path);
-    char *filename;
     char *dirname;
     char div[2] = "/";
-    dirname = strtok(path,div);
-    while (dirname != NULL)
+    strcpy(path,argv[1]);
+    if(!strcmp(path,"root/"))
     {
-        filename = dirname;
-        dirname = strtok(NULL,div);
+        cur_id = 2;
+    }
+    else
+    {
+        dirname = strtok(path,div);
+        while (dirname != NULL)
+        {
+            // printf("file type:%d\n",inodes[cur_id + 1].file_type);
+            cur_id = ScanDir(dirname,cur_id);
+            if(cur_id == PATH_ERR)
+            {
+                return PATH_ERR;
+            }
+            dirname = strtok(NULL,div);
+        }
     }
     
+    /*if(inodes[cur_id].file_type != TYPE_DIR)
+    {
+        printf("Path error! %s is not a path of directory\n",argv[1]);
+        return PATH_ERR;
+    }*/
+    int i,j,block_num;
+    char buf[512] = {0};
+    struct dir_item *pdir = (struct dir_item *)buf;
+    open_disk();
+    for(i=0;i<inodes[cur_id].link;i++)
+    {
+        block_num = inodes[cur_id].block_point[i];
+        disk_read_block(DATA_START + block_num * 2,buf);
+        pdir = (struct dir_item *)buf;
+        if(pdir->valid = ITEM_VALID)
+            printf("%s\n",pdir->name);
+    }
+    close_disk();
+}
+int mkdir(int argc,char* argv[])
+{
+    if(SP_BLK.free_inode_count <1)
+    {
+        printf("No more available inodes.\n");
+        return NO_INODE;
+    }
+    if(argc != 3)
+    {
+        printf("Syntax error!The number of arguments must be 3 : mkdir [path] [dirname]\n");
+        return SYNTAX_ERR;
+    }
+    if(argv[1][0] == '/' || argv[1][ strlen(argv[1]) - 1 ] != '/')
+    {
+        printf("Path error!The path must be like \"dir1/dir2/.../\" or \"root/\"\n");
+        return PATH_ERR;
+    }
+    if(strchr(argv[2],'/') != NULL)
+    {
+        printf("Folder name error!The new folder can't include '/'\n");
+        return DIR_ERR;
+    }
+    uint32_t cur_id = 2;    // start at root directory:inode id 2
+    char path[MAX_ARG_LEN];
+    char new_folder[MAX_ARG_LEN];
+    char *dirname;
+    char div[2] = "/";
+    strcpy(path,argv[1]);
+    strcpy(new_folder,argv[2]);
+    if(!strcmp(path,"root/"))
+    {
+        cur_id = 2;
+    }
+    else
+    {
+        dirname = strtok(path,div);
+        while (dirname != NULL)
+        {
+            printf("dirname:%s,cur_id:%d\n",dirname,cur_id);
+            cur_id = ScanDir(dirname,cur_id);
+            if(cur_id == PATH_ERR)
+            {
+                return PATH_ERR;
+            }
+            dirname = strtok(NULL,div);
+        }
+    }
+    int new_inode_id,new_block_num,cur_pos;
+    char wbuf[512] = {0};
+    struct dir_item *pdir = (struct dir_item *)wbuf;
+    SP_BLK.free_inode_count--;
+    SP_BLK.dir_inode_count++;
+    SP_BLK.free_block_count--;
+    new_inode_id = AllocateInode();
+    new_block_num = AllocateBlock();
+    // init the new inode.
+    inodes[new_inode_id].link++;
+    cur_pos = inodes[new_inode_id].link;
+    inodes[new_inode_id].block_point[cur_pos - 1] = new_block_num;
+    printf("The block of %s is : %x\n",new_folder,new_block_num);
+    // set the directory inode.
+    new_block_num = AllocateBlock();
+    printf("The block item of %s is : %x\n",new_folder,new_block_num);
+    inodes[cur_id].link++;
+    cur_pos = inodes[cur_id].link;
+    inodes[cur_id].block_point[cur_pos - 1] = new_block_num;
+    pdir -> inode_id = new_inode_id;
+    strcpy(pdir->name,argv[2]);
+    pdir -> type = TYPE_DIR;
+    pdir -> valid = ITEM_VALID;
+    open_disk();
+    disk_write_block(DATA_START+new_block_num*2,wbuf);
+    close_disk();
+    UpdateSuperBlock();
+    UpdateInode();
 }
 void touch(int argc,char* argv[])
 {
@@ -237,6 +398,8 @@ int main(void)
         buf[strlen(buf) - 1] = 0;
         if(!strcmp(buf,"shutdown"))
         {
+            UpdateSuperBlock();
+            UpdateInode();
             return 0;
         }
         ScanCmd(buf,argv,&argc);
